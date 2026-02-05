@@ -36,6 +36,14 @@
 
     --radius: 0.75rem;
 
+    /* Decorative accent colors */
+    --accent-yellow: 45 93% 58%;
+    --accent-orange: 25 95% 53%;
+    --accent-emerald: 160 84% 39%;
+    --accent-teal: 174 72% 40%;
+    --accent-violet: 263 70% 58%;
+    --accent-purple: 271 81% 56%;
+
     /* Custom portfolio tokens */
     --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(199 89% 48%) 100%);
     --gradient-hero: linear-gradient(135deg, hsl(217 91% 97%) 0%, hsl(199 89% 95%) 50%, hsl(0 0% 100%) 100%);
