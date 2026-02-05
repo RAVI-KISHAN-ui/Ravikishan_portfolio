@@ -60,6 +60,12 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        "accent-yellow": "hsl(var(--accent-yellow))",
+        "accent-orange": "hsl(var(--accent-orange))",
+        "accent-emerald": "hsl(var(--accent-emerald))",
+        "accent-teal": "hsl(var(--accent-teal))",
+        "accent-violet": "hsl(var(--accent-violet))",
+        "accent-purple": "hsl(var(--accent-purple))",
       },
       borderRadius: {
         lg: "var(--radius)",
