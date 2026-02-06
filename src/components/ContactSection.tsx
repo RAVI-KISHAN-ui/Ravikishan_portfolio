@@ -1,10 +1,16 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { Mail, Github, Linkedin, Send, MapPin, Clock, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import emailjs from "@emailjs/browser";
+
+// EmailJS Configuration
+const EMAILJS_SERVICE_ID = "service_oggs1ph";
+const EMAILJS_TEMPLATE_ID = "template_mzdjjv7";
+const EMAILJS_PUBLIC_KEY = "bs33y6sqfsp1jjz-p";
 
 const contactInfo = [
   {
@@ -29,6 +35,7 @@ const contactInfo = [
 
 const ContactSection = () => {
   const { toast } = useToast();
+  const formRef = useRef<HTMLFormElement>(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -38,17 +45,34 @@ const ContactSection = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formRef.current) return;
+    
     setIsSubmitting(true);
     
-    // Simulate submission
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    toast({
-      title: "Message sent! 🎉",
-      description: "Thank you for reaching out. I'll get back to you within 24 hours!",
-    });
-    setFormData({ name: "", email: "", message: "" });
-    setIsSubmitting(false);
+    try {
+      await emailjs.sendForm(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_ID,
+        formRef.current,
+        EMAILJS_PUBLIC_KEY
+      );
+      
+      toast({
+        title: "Message sent! 🎉",
+        description: "Thank you for reaching out. I'll get back to you within 24 hours!",
+      });
+      setFormData({ name: "", email: "", message: "" });
+    } catch (error) {
+      console.error("EmailJS error:", error);
+      toast({
+        title: "Failed to send message",
+        description: "Something went wrong. Please try again or contact me directly via email.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (
@@ -163,7 +187,7 @@ const ContactSection = () => {
             transition={{ duration: 0.6 }}
             className="lg:col-span-3"
           >
-            <form onSubmit={handleSubmit} className="bg-card rounded-3xl p-8 md:p-10 border border-border">
+            <form ref={formRef} onSubmit={handleSubmit} className="bg-card rounded-3xl p-8 md:p-10 border border-border">
               <h3 className="text-2xl font-bold mb-6">Send a Message</h3>
               
               <div className="space-y-5">
