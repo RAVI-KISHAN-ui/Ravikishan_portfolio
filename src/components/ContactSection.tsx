@@ -1,10 +1,11 @@
-import { useState, useRef } from "react";
-import { motion } from "framer-motion";
-import { Mail, Github, Linkedin, Send, MapPin, Clock, ArrowRight } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Mail, Github, Linkedin, Send, MapPin, Clock, ArrowRight, CheckCircle2, Shield, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import emailjs from "@emailjs/browser";
 
 // EmailJS Configuration
@@ -42,9 +43,145 @@ const ContactSection = () => {
     message: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // OTP verification states
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const [otpExpiry, setOtpExpiry] = useState(0);
+
+  // Cooldown timer
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
+
+  // OTP expiry timer
+  useEffect(() => {
+    if (otpExpiry > 0) {
+      const timer = setTimeout(() => setOtpExpiry(otpExpiry - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (otpExpiry === 0 && otpSent && !isEmailVerified) {
+      setOtpSent(false);
+      setOtp("");
+    }
+  }, [otpExpiry, otpSent, isEmailVerified]);
+
+  // Reset verification when email changes
+  useEffect(() => {
+    if (isEmailVerified) {
+      setIsEmailVerified(false);
+      setOtpSent(false);
+      setOtp("");
+      setOtpExpiry(0);
+    }
+  }, [formData.email]);
+
+  const handleSendOtp = async () => {
+    if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      toast({
+        title: "Invalid email",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSendingOtp(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("send-otp", {
+        body: { email: formData.email },
+      });
+
+      if (error) throw error;
+
+      if (data.error) {
+        if (data.cooldownRemaining) {
+          setCooldown(data.cooldownRemaining);
+        }
+        throw new Error(data.error);
+      }
+
+      setOtpSent(true);
+      setOtpExpiry(300); // 5 minutes
+      setCooldown(60); // 60 second cooldown for resend
+
+      toast({
+        title: "OTP Sent! 📧",
+        description: `Verification code sent to ${formData.email}. Check your inbox!`,
+      });
+    } catch (error: any) {
+      console.error("Send OTP error:", error);
+      toast({
+        title: "Failed to send OTP",
+        description: error.message || "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otp || otp.length !== 6) {
+      toast({
+        title: "Invalid OTP",
+        description: "Please enter the 6-digit code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-otp", {
+        body: { email: formData.email, otp },
+      });
+
+      if (error) throw error;
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setIsEmailVerified(true);
+      setOtpSent(false);
+      setOtpExpiry(0);
+
+      toast({
+        title: "Email Verified! ✅",
+        description: "Your email has been verified. You can now send your message.",
+      });
+    } catch (error: any) {
+      console.error("Verify OTP error:", error);
+      toast({
+        title: "Verification failed",
+        description: error.message || "Invalid or expired OTP. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!isEmailVerified) {
+      toast({
+        title: "Email not verified",
+        description: "Please verify your email before sending a message.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     if (!formRef.current) return;
     
@@ -63,6 +200,9 @@ const ContactSection = () => {
         description: "Thank you for reaching out. I'll get back to you within 24 hours!",
       });
       setFormData({ name: "", email: "", message: "" });
+      setIsEmailVerified(false);
+      setOtpSent(false);
+      setOtp("");
     } catch (error) {
       console.error("EmailJS error:", error);
       toast({
@@ -82,6 +222,12 @@ const ContactSection = () => {
       ...prev,
       [e.target.name]: e.target.value,
     }));
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   return (
@@ -191,38 +337,126 @@ const ContactSection = () => {
               <h3 className="text-2xl font-bold mb-6">Send a Message</h3>
               
               <div className="space-y-5">
-                <div className="grid sm:grid-cols-2 gap-5">
-                  <div>
-                    <label htmlFor="name" className="text-sm font-medium mb-2 block">
-                      Your Name
-                    </label>
-                    <Input
-                      id="name"
-                      name="name"
-                      placeholder="John Doe"
-                      value={formData.name}
-                      onChange={handleChange}
-                      required
-                      className="bg-secondary/50 border-border focus:border-primary h-12 rounded-xl"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="email" className="text-sm font-medium mb-2 block">
-                      Your Email
-                    </label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      placeholder="john@example.com"
-                      value={formData.email}
-                      onChange={handleChange}
-                      required
-                      className="bg-secondary/50 border-border focus:border-primary h-12 rounded-xl"
-                    />
-                  </div>
+                {/* Name Field */}
+                <div>
+                  <label htmlFor="name" className="text-sm font-medium mb-2 block">
+                    Your Name
+                  </label>
+                  <Input
+                    id="name"
+                    name="name"
+                    placeholder="John Doe"
+                    value={formData.name}
+                    onChange={handleChange}
+                    required
+                    className="bg-secondary/50 border-border focus:border-primary h-12 rounded-xl"
+                  />
                 </div>
 
+                {/* Email Field with OTP Verification */}
+                <div>
+                  <label htmlFor="email" className="text-sm font-medium mb-2 block flex items-center gap-2">
+                    Your Email
+                    {isEmailVerified && (
+                      <span className="inline-flex items-center gap-1 text-xs text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                        <CheckCircle2 size={12} />
+                        Verified
+                      </span>
+                    )}
+                  </label>
+                  
+                  <div className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        placeholder="john@example.com"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                        disabled={isEmailVerified}
+                        className={`bg-secondary/50 border-border focus:border-primary h-12 rounded-xl ${
+                          isEmailVerified ? "border-emerald-500/50 bg-emerald-500/5" : ""
+                        }`}
+                      />
+                      {isEmailVerified && (
+                        <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-500" />
+                      )}
+                    </div>
+                    
+                    {!isEmailVerified && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleSendOtp}
+                        disabled={isSendingOtp || cooldown > 0 || !formData.email}
+                        className="h-12 px-4 rounded-xl whitespace-nowrap border-primary/30 hover:bg-primary/10"
+                      >
+                        {isSendingOtp ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : cooldown > 0 ? (
+                          `Wait ${cooldown}s`
+                        ) : otpSent ? (
+                          "Resend OTP"
+                        ) : (
+                          <>
+                            <Shield size={16} className="mr-1" />
+                            Send OTP
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* OTP Input */}
+                  <AnimatePresence>
+                    {otpSent && !isEmailVerified && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-4 p-4 bg-secondary/30 rounded-xl border border-border"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-sm text-muted-foreground">
+                            Enter the 6-digit code sent to your email
+                          </p>
+                          {otpExpiry > 0 && (
+                            <span className="text-xs text-primary font-medium">
+                              Expires in {formatTime(otpExpiry)}
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <Input
+                            type="text"
+                            maxLength={6}
+                            placeholder="000000"
+                            value={otp}
+                            onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                            className="flex-1 bg-background border-border focus:border-primary h-12 rounded-xl text-center text-lg tracking-[0.5em] font-mono"
+                          />
+                          <Button
+                            type="button"
+                            onClick={handleVerifyOtp}
+                            disabled={isVerifyingOtp || otp.length !== 6}
+                            className="h-12 px-6 rounded-xl bg-primary hover:bg-primary/90"
+                          >
+                            {isVerifyingOtp ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              "Verify"
+                            )}
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                {/* Message Field */}
                 <div>
                   <label htmlFor="message" className="text-sm font-medium mb-2 block">
                     Your Message
@@ -239,20 +473,21 @@ const ContactSection = () => {
                   />
                 </div>
 
+                {/* Submit Button */}
                 <Button 
                   type="submit" 
                   className="w-full h-14 btn-primary text-base rounded-xl"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !isEmailVerified}
                 >
                   {isSubmitting ? (
                     <span className="flex items-center gap-2">
-                      <motion.span
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      >
-                        ⏳
-                      </motion.span>
+                      <Loader2 className="w-5 h-5 animate-spin" />
                       Sending...
+                    </span>
+                  ) : !isEmailVerified ? (
+                    <span className="flex items-center gap-2">
+                      <Shield size={18} />
+                      Verify Email to Send
                     </span>
                   ) : (
                     <span className="flex items-center gap-2">
@@ -261,6 +496,12 @@ const ContactSection = () => {
                     </span>
                   )}
                 </Button>
+
+                {!isEmailVerified && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Email verification helps prevent spam and ensures your message reaches me.
+                  </p>
+                )}
               </div>
             </form>
           </motion.div>
