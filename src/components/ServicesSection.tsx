@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Globe, PenTool, Rocket, Sparkles } from "lucide-react";
+import { Globe, PenTool } from "lucide-react";
 
 const services = [
   {
@@ -16,13 +16,6 @@ const services = [
     features: ["User Research", "Wireframing", "Prototyping", "Visual Design"],
     gradient: "from-accent-violet to-accent-purple",
   },
-];
-
-const process = [
-  { step: "01", title: "Discover", description: "Understanding your needs and goals", icon: Sparkles },
-  { step: "02", title: "Design", description: "Creating intuitive user experiences", icon: PenTool },
-  { step: "03", title: "Develop", description: "Building with modern technologies", icon: Globe },
-  { step: "04", title: "Deploy", description: "Launching and optimizing", icon: Rocket },
 ];
 
 const ServicesSection = () => {
@@ -95,47 +88,6 @@ const ServicesSection = () => {
           ))}
         </div>
 
-        {/* Process Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-center mb-12"
-        >
-          <h3 className="text-2xl font-bold mb-2">My Working Process</h3>
-          <p className="text-muted-foreground">A streamlined approach to deliver quality results</p>
-        </motion.div>
-
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {process.map((item, index) => (
-            <motion.div
-              key={item.step}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="relative group"
-            >
-              {/* Connector line */}
-              {index < process.length - 1 && (
-                <div className="hidden lg:block absolute top-12 left-[60%] w-[80%] h-px bg-gradient-to-r from-border to-transparent" />
-              )}
-              
-              <div className="bg-card rounded-2xl p-6 border border-border hover:border-primary/30 transition-all duration-300 text-center relative">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full">
-                  {item.step}
-                </div>
-                <div className="pt-4">
-                  <div className="inline-flex p-4 rounded-xl bg-secondary mb-4 group-hover:bg-primary/10 transition-colors">
-                    <item.icon className="w-6 h-6 text-primary" />
-                  </div>
-                  <h4 className="font-bold text-lg mb-2">{item.title}</h4>
-                  <p className="text-sm text-muted-foreground">{item.description}</p>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
       </div>
     </section>
   );
